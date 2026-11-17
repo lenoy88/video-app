@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#f7f7f4">
-<title>FrameFlow — turn photos into a video</title>
+<title>FrameFlow — turn photos into a cartoon video</title>
 <style>
 :root{--ink:#171a18;--muted:#7d837d;--line:#e6e9e4;--paper:#f7f7f4;--green:#c8f169;--deep:#18251b;--card:#fff;--purple:#c8baff}
 *{box-sizing:border-box}
@@ -39,12 +39,22 @@ button{cursor:pointer}
 .photo{height:88px;border-radius:11px;overflow:hidden;position:relative;background:#e9ece5}
 .photo img{width:100%;height:100%;object-fit:cover;display:block}
 .photo .remove{position:absolute;right:5px;top:5px;border:0;width:22px;height:22px;background:#ffffffdf;border-radius:50%;font-size:14px;line-height:1}
+.photo .tag{position:absolute;left:5px;bottom:5px;background:#18251bcc;color:#e6f7b8;font-size:9px;font-weight:700;padding:2px 6px;border-radius:99px}
 .field-label{display:block;font-size:11px;font-weight:700;margin:18px 0 8px}
 .prompt{width:100%;height:100px;border:1px solid #e0e4de;border-radius:12px;padding:13px;resize:vertical;outline:none;line-height:1.45;font-size:13px}
-.prompt:focus{border-color:#98b574;box-shadow:0 0 0 3px #eaf2df}
+.prompt:focus,.text-input:focus{border-color:#98b574;box-shadow:0 0 0 3px #eaf2df;outline:none}
 .hint{font-size:10px;color:#8a9188;margin:6px 1px 0}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.select{width:100%;border:1px solid #e0e4de;border-radius:10px;background:white;padding:10px 11px;font-size:12px;color:#303830}
+.select,.text-input{width:100%;border:1px solid #e0e4de;border-radius:10px;background:white;padding:10px 11px;font-size:12px;color:#303830}
+.mode{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+.mode label{border:1.5px solid #e0e4de;border-radius:12px;padding:12px;cursor:pointer;font-size:12px;line-height:1.35;display:block}
+.mode label small{display:block;color:#7d837d;font-size:10px;margin-top:3px}
+.mode input{display:none}
+.mode input:checked + span{color:#18251b}
+.mode label:has(input:checked){border-color:#68834d;background:#f4f8ec}
+.ai-box{display:none;margin-top:14px;border:1px solid #e0e4de;background:#fafbf8;border-radius:12px;padding:14px}
+.ai-box.show{display:block}
+.ai-box .field-label:first-child{margin-top:0}
 .create{margin-top:20px;width:100%;border:0;background:var(--deep);color:white;border-radius:12px;padding:14px 16px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:9px;transition:.2s}
 .create:hover{background:#294331;transform:translateY(-1px)}
 .create:disabled{opacity:.5;cursor:not-allowed;transform:none}
@@ -71,6 +81,7 @@ button{cursor:pointer}
 .tips strong{color:#414d3d}
 .tips .dot{color:#98ae73;font-size:13px;margin-right:6px}
 .status{min-height:16px;font-size:11px;color:#617454;text-align:center;margin-top:10px}
+.status.error{color:#a4402f}
 .footer{font-size:10px;color:#a0a69e;text-align:center;padding:0 18px 30px}
 @media(max-width:760px){
   body{background-attachment:scroll;background-size:cover}
@@ -81,7 +92,6 @@ button{cursor:pointer}
   .layout{grid-template-columns:1fr}
   .panel{padding:18px}
   .preview-panel{grid-row:1}
-  .stage{aspect-ratio:16/10}
   .photos{grid-template-columns:repeat(4,1fr)}
   .photo{height:72px}
 }
@@ -97,10 +107,10 @@ button{cursor:pointer}
   <div class="intro">
     <div>
       <div class="eyebrow">Your story, in motion</div>
-      <h1>Make a video from<br>the moments you have.</h1>
-      <p>Add your photos, describe the feeling, and FrameFlow will turn them into a short moving story you can save.</p>
+      <h1>Turn your photos into<br>a cartoon video.</h1>
+      <p>Add your photos, pick a cartoon look, and FrameFlow turns them into a short animated story you can save.</p>
     </div>
-    <div class="badge">✦ &nbsp;Simple photo video maker</div>
+    <div class="badge">✦ &nbsp;Cartoon photo video maker</div>
   </div>
 
   <div class="layout">
@@ -127,7 +137,29 @@ button{cursor:pointer}
       <textarea id="prompt" class="prompt" placeholder="A warm weekend with my family — golden light, happy moments, and a hopeful ending..."></textarea>
       <div class="hint">Tell us the mood, subject, or a short message to show on screen.</div>
 
+      <label class="field-label">3 &nbsp; Cartoon engine</label>
+      <div class="mode">
+        <label><input type="radio" name="engine" value="local" checked><span><strong>Instant cartoon</strong><small>Runs in your browser. Free, no setup.</small></span></label>
+        <label><input type="radio" name="engine" value="ai"><span><strong>AI cartoon</strong><small>Higher quality. Uses your AI endpoint.</small></span></label>
+      </div>
+
+      <div class="ai-box" id="aiBox">
+        <label class="field-label" for="aiEndpoint">AI endpoint URL</label>
+        <input class="text-input" id="aiEndpoint" type="url" placeholder="https://your-server.com/api/cartoonize">
+        <label class="field-label" for="aiKey">Access key (optional)</label>
+        <input class="text-input" id="aiKey" type="password" placeholder="Sent as a Bearer token">
+        <div class="hint">Your endpoint receives POST JSON { image, prompt, style } and returns { "image": "url or data URL" }. Keep any provider secret on your server. These two fields are saved only in this browser.</div>
+      </div>
+
       <div class="row">
+        <div>
+          <label class="field-label" for="toon">Cartoon style</label>
+          <select class="select" id="toon">
+            <option value="comic">Comic book</option>
+            <option value="storybook">Soft storybook</option>
+            <option value="ink">Bold ink</option>
+          </select>
+        </div>
         <div>
           <label class="field-label" for="style">Visual mood</label>
           <select class="select" id="style">
@@ -138,20 +170,23 @@ button{cursor:pointer}
             <option value="bold">Bold &amp; modern</option>
           </select>
         </div>
+      </div>
+
+      <div class="row">
         <div>
           <label class="field-label" for="length">Video length</label>
           <select class="select" id="length">
-            <option value="60">1 minute</option>
+            <option value="30">30 seconds</option>
+            <option value="60" selected>1 minute</option>
             <option value="180">3 minutes</option>
             <option value="300">5 minutes</option>
           </select>
         </div>
+        <div></div>
       </div>
 
-      <button class="create" id="create" disabled>
-        <span>✦</span> Create my video <span>→</span>
-      </button>
-      <div class="notice">Your photos stay in this browser. Creating a video takes about as long as the selected video length.</div>
+      <button class="create" id="create" disabled><span>✦</span> Create my cartoon video <span>→</span></button>
+      <div class="notice">Your photos stay in this browser unless you use AI cartoon, which sends them to your endpoint. Creating a video takes about as long as the selected video length.</div>
     </section>
 
     <section class="panel preview-panel">
@@ -163,7 +198,7 @@ button{cursor:pointer}
         <canvas id="canvas" width="1280" height="800"></canvas>
         <div class="empty-stage">
           <div class="play-mark">▶</div>
-          <strong>Your story will appear here</strong>
+          <strong>Your cartoon story will appear here</strong>
           <span>Add photos and a prompt to get started</span>
         </div>
       </div>
@@ -176,7 +211,7 @@ button{cursor:pointer}
       <div class="status" id="status"></div>
       <div class="tips">
         <span class="dot">✦</span>
-        <strong>What this app makes:</strong> a short animated video from your photos, with gentle motion and text inspired by your prompt. New AI-generated footage isn’t connected in this version.
+        <strong>How it works:</strong> each photo becomes a cartoon scene, either with the instant in-browser filter or with AI through your endpoint. Scenes get gentle camera motion and text from your prompt, then are saved as one video.
       </div>
     </section>
   </div>
@@ -195,13 +230,42 @@ const ctx = canvas.getContext('2d');
 const promptEl = document.getElementById('prompt');
 const styleEl = document.getElementById('style');
 const lengthEl = document.getElementById('length');
+const toonEl = document.getElementById('toon');
 const statusEl = document.getElementById('status');
 const downloadBtn = document.getElementById('download');
+const aiBox = document.getElementById('aiBox');
+const aiEndpoint = document.getElementById('aiEndpoint');
+const aiKey = document.getElementById('aiKey');
 
 let photos = [];
 let recordedUrl = '';
 let isRecording = false;
+let isWorking = false;
 
+/* ---------- settings ---------- */
+aiEndpoint.value = localStorage.getItem('ff_endpoint') || '';
+aiKey.value = localStorage.getItem('ff_key') || '';
+aiEndpoint.addEventListener('change', () => localStorage.setItem('ff_endpoint', aiEndpoint.value.trim()));
+aiKey.addEventListener('change', () => localStorage.setItem('ff_key', aiKey.value));
+
+function engine() {
+  return document.querySelector('input[name="engine"]:checked').value;
+}
+
+function setStatus(text, isError = false) {
+  statusEl.textContent = text;
+  statusEl.classList.toggle('error', isError);
+}
+
+document.querySelectorAll('input[name="engine"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    aiBox.classList.toggle('show', engine() === 'ai');
+    renderThumbs();
+    if (photos.length && !isRecording) showScene(0);
+  });
+});
+
+/* ---------- photos ---------- */
 function addFiles(files) {
   for (const file of [...files]) {
     if (!file.type.startsWith('image/')) continue;
@@ -209,16 +273,20 @@ function addFiles(files) {
 
     const url = URL.createObjectURL(file);
     const img = new Image();
-    img.onload = renderThumbs;
+    const photo = { file, url, img, local: null, ai: null, aiKey: '' };
+    img.onload = () => {
+      photo.local = cartoonize(img);
+      renderThumbs();
+      if (!isRecording) showScene(0);
+    };
     img.src = url;
-    photos.push({ file, url, img });
+    photos.push(photo);
   }
   renderThumbs();
 }
 
 function renderThumbs() {
   photosEl.innerHTML = '';
-
   photos.forEach((photo, index) => {
     const box = document.createElement('div');
     box.className = 'photo';
@@ -239,33 +307,165 @@ function renderThumbs() {
     };
 
     box.append(image, remove);
+
+    if (engine() === 'ai' && photo.ai && photo.aiKey === aiCacheKey()) {
+      const tag = document.createElement('div');
+      tag.className = 'tag';
+      tag.textContent = 'AI ✓';
+      box.append(tag);
+    }
     photosEl.append(box);
   });
 
   countEl.textContent = photos.length + ' photo' + (photos.length === 1 ? '' : 's');
-  createBtn.disabled = !photos.length;
+  createBtn.disabled = !photos.length || isWorking;
 }
 
 input.addEventListener('change', event => addFiles(event.target.files));
 
 const drop = document.getElementById('drop');
-
-['dragenter', 'dragover'].forEach(eventName => {
-  drop.addEventListener(eventName, event => {
-    event.preventDefault();
-    drop.classList.add('drag');
-  });
+['dragenter', 'dragover'].forEach(name => {
+  drop.addEventListener(name, event => { event.preventDefault(); drop.classList.add('drag'); });
 });
-
-['dragleave', 'drop'].forEach(eventName => {
-  drop.addEventListener(eventName, event => {
-    event.preventDefault();
-    drop.classList.remove('drag');
-  });
+['dragleave', 'drop'].forEach(name => {
+  drop.addEventListener(name, event => { event.preventDefault(); drop.classList.remove('drag'); });
 });
-
 drop.addEventListener('drop', event => addFiles(event.dataTransfer.files));
 
+/* ---------- cartoon: instant (in browser) ---------- */
+function coverCanvas(img) {
+  const W = canvas.width, H = canvas.height;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const x = c.getContext('2d', { willReadFrequently: true });
+  const s = Math.max(W / img.width, H / img.height);
+  const w = img.width * s, h = img.height * s;
+  return { c, x, W, H, w, h, ox: (W - w) / 2, oy: (H - h) / 2 };
+}
+
+function cartoonize(img) {
+  const look = {
+    comic:     { levels: 5, edge: 90,  blur: 3, sat: 1.5 },
+    storybook: { levels: 8, edge: 140, blur: 4, sat: 1.25 },
+    ink:       { levels: 4, edge: 60,  blur: 2, sat: 1.7 }
+  }[toonEl.value];
+
+  const { c, x, W, H, w, h, ox, oy } = coverCanvas(img);
+  x.filter = 'blur(' + look.blur + 'px) saturate(' + look.sat + ') contrast(1.1)';
+  x.drawImage(img, ox, oy, w, h);
+  x.filter = 'none';
+
+  const data = x.getImageData(0, 0, W, H);
+  const p = data.data;
+
+  const g = new Float32Array(W * H);
+  for (let i = 0; i < W * H; i++) {
+    g[i] = 0.299 * p[i * 4] + 0.587 * p[i * 4 + 1] + 0.114 * p[i * 4 + 2];
+  }
+
+  const step = 255 / look.levels;
+  for (let i = 0; i < p.length; i += 4) {
+    p[i]     = Math.round(p[i] / step) * step;
+    p[i + 1] = Math.round(p[i + 1] / step) * step;
+    p[i + 2] = Math.round(p[i + 2] / step) * step;
+  }
+
+  for (let y = 1; y < H - 1; y++) {
+    for (let xx = 1; xx < W - 1; xx++) {
+      const i = y * W + xx;
+      const gx = -g[i - W - 1] - 2 * g[i - 1] - g[i + W - 1] + g[i - W + 1] + 2 * g[i + 1] + g[i + W + 1];
+      const gy = -g[i - W - 1] - 2 * g[i - W] - g[i - W + 1] + g[i + W - 1] + 2 * g[i + W] + g[i + W + 1];
+      if (Math.hypot(gx, gy) > look.edge) {
+        const k = i * 4;
+        p[k] *= 0.15; p[k + 1] *= 0.15; p[k + 2] *= 0.15;
+      }
+    }
+  }
+  x.putImageData(data, 0, 0);
+  return c;
+}
+
+toonEl.addEventListener('change', () => {
+  photos.forEach(photo => { if (photo.img.complete) photo.local = cartoonize(photo.img); });
+  renderThumbs();
+  if (photos.length && !isRecording) showScene(0);
+});
+
+/* ---------- cartoon: AI (your endpoint) ---------- */
+const STYLE_WORDS = {
+  comic: 'comic book cartoon with bold outlines and flat vibrant colors',
+  storybook: 'soft storybook cartoon illustration with gentle watercolor shading',
+  ink: 'bold ink cartoon with thick black linework and limited colors'
+};
+
+function aiCacheKey() {
+  return toonEl.value + '|' + promptEl.value.trim();
+}
+
+function fileToDataUrl(img, maxSide = 1024) {
+  const s = Math.min(1, maxSide / Math.max(img.width, img.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(img.width * s);
+  c.height = Math.round(img.height * s);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.9);
+}
+
+async function loadImageFromBlob(blob) {
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  await new Promise((resolve, reject) => {
+    img.onload = resolve;
+    img.onerror = () => reject(new Error('The AI image could not be read.'));
+    img.src = url;
+  });
+  const { c, x, w, h, ox, oy } = coverCanvas(img);
+  x.drawImage(img, ox, oy, w, h);
+  URL.revokeObjectURL(url);
+  return c;
+}
+
+async function aiCartoon(photo) {
+  const endpoint = aiEndpoint.value.trim();
+  if (!endpoint) throw new Error('Add your AI endpoint URL first, or switch to Instant cartoon.');
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (aiKey.value) headers.Authorization = 'Bearer ' + aiKey.value;
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      image: fileToDataUrl(photo.img),
+      style: toonEl.value,
+      prompt: 'Turn this photo into a ' + STYLE_WORDS[toonEl.value] +
+        '. Keep the same people, faces, poses and composition. ' + promptEl.value.trim()
+    })
+  });
+
+  if (!response.ok) throw new Error('The AI service returned an error (' + response.status + ').');
+
+  const result = await response.json();
+  if (!result.image) throw new Error('The AI service did not return an image.');
+
+  // fetch as a blob so the canvas stays exportable
+  const imageBlob = await (await fetch(result.image)).blob();
+  return loadImageFromBlob(imageBlob);
+}
+
+async function runAiForAll() {
+  const key = aiCacheKey();
+  for (let i = 0; i < photos.length; i++) {
+    const photo = photos[i];
+    if (photo.ai && photo.aiKey === key) continue;
+    setStatus('Drawing cartoon ' + (i + 1) + ' of ' + photos.length + ' with AI…');
+    photo.ai = await aiCartoon(photo);
+    photo.aiKey = key;
+    renderThumbs();
+  }
+}
+
+/* ---------- drawing ---------- */
 function cleanPrompt() {
   return promptEl.value.trim().replace(/[.!?]+$/, '');
 }
@@ -273,16 +473,8 @@ function cleanPrompt() {
 function linesForPrompt() {
   const prompt = cleanPrompt();
   if (!prompt) return ['A story worth keeping'];
-
-  let parts = prompt
-    .split(/[,;—–]|\s+and\s+/i)
-    .map(part => part.trim())
-    .filter(Boolean);
-
-  if (parts.length === 1 && parts[0].length > 38) {
-    parts = [parts[0].slice(0, 37) + '…'];
-  }
-
+  let parts = prompt.split(/[,;—–]|\s+and\s+/i).map(part => part.trim()).filter(Boolean);
+  if (parts.length === 1 && parts[0].length > 38) parts = [parts[0].slice(0, 37) + '…'];
   return parts.slice(0, 4);
 }
 
@@ -296,15 +488,18 @@ function palette() {
   }[styleEl.value];
 }
 
+function sourceFor(photo) {
+  if (engine() === 'ai' && photo.ai && photo.aiKey === aiCacheKey()) return photo.ai;
+  return photo.local || photo.img;
+}
+
 function drawCover(img, zoom = 1, pan = 0) {
-  const canvasWidth = canvas.width;
-  const canvasHeight = canvas.height;
-  const scale = Math.max(canvasWidth / img.width, canvasHeight / img.height) * zoom;
+  const cw = canvas.width, ch = canvas.height;
+  const scale = Math.max(cw / img.width, ch / img.height) * zoom;
   const width = img.width * scale;
   const height = img.height * scale;
-  const x = (canvasWidth - width) / 2 + pan * (canvasWidth - width);
-  const y = (canvasHeight - height) / 2;
-
+  const x = (cw - width) / 2 + pan * (cw - width);
+  const y = (ch - height) / 2;
   ctx.drawImage(img, x, y, width, height);
 }
 
@@ -312,7 +507,6 @@ function wrap(text, maxLength = 31) {
   const words = text.split(/\s+/);
   const lines = [];
   let line = '';
-
   for (const word of words) {
     if ((line + ' ' + word).trim().length > maxLength && line) {
       lines.push(line);
@@ -321,7 +515,6 @@ function wrap(text, maxLength = 31) {
       line = (line + ' ' + word).trim();
     }
   }
-
   if (line) lines.push(line);
   return lines.slice(0, 2);
 }
@@ -334,7 +527,7 @@ function drawScene(index, progress = 0, withText = true) {
 
   const zoom = 1.03 + 0.08 * progress;
   const pan = Math.sin(progress * Math.PI) * 0.035;
-  drawCover(photo.img, zoom, pan);
+  drawCover(sourceFor(photo), zoom, pan);
 
   const colors = palette();
   const gradient = ctx.createLinearGradient(0, canvas.height * 0.45, 0, canvas.height);
@@ -372,65 +565,75 @@ function formatTime(milliseconds) {
   return String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
 }
 
+/* ---------- create video ---------- */
 async function createVideo() {
-  if (!photos.length) return;
+  if (!photos.length || isWorking) return;
 
-  downloadBtn.classList.remove('show');
-  statusEl.textContent = 'Building your story…';
+  isWorking = true;
   createBtn.disabled = true;
+  downloadBtn.classList.remove('show');
   showScene(0);
 
   if (!canvas.captureStream || !window.MediaRecorder) {
-    statusEl.textContent = 'Video export is not supported in this browser. Try Chrome on a computer.';
+    setStatus('Video export is not supported in this browser. Try Chrome on a computer.', true);
+    isWorking = false;
     createBtn.disabled = false;
     return;
   }
 
+  if (engine() === 'ai') {
+    try {
+      await runAiForAll();
+    } catch (error) {
+      setStatus(error.message + ' You can switch to Instant cartoon and try again.', true);
+      isWorking = false;
+      createBtn.disabled = false;
+      return;
+    }
+  }
+
+  setStatus('Building your story…');
+  startRecording();
+}
+
+function startRecording() {
   const totalDuration = Number(lengthEl.value) * 1000;
   const timePerPhoto = totalDuration / photos.length;
   const stream = canvas.captureStream(30);
 
-  const mimeType = [
-    'video/webm;codecs=vp9',
-    'video/webm;codecs=vp8',
-    'video/webm'
-  ].find(type => MediaRecorder.isTypeSupported(type));
+  const mimeType = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
+    .find(type => MediaRecorder.isTypeSupported(type));
 
   let recorder;
-
   try {
     recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
   } catch (error) {
-    statusEl.textContent = 'Could not start video export in this browser.';
+    setStatus('Could not start video export in this browser.', true);
+    isWorking = false;
     createBtn.disabled = false;
     return;
   }
 
   const chunks = [];
-
-  recorder.ondataavailable = event => {
-    if (event.data.size) chunks.push(event.data);
-  };
+  recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
 
   recorder.onstop = () => {
     stream.getTracks().forEach(track => track.stop());
-
     if (recordedUrl) URL.revokeObjectURL(recordedUrl);
 
-    const videoBlob = new Blob(chunks, { type: 'video/webm' });
-    recordedUrl = URL.createObjectURL(videoBlob);
-
+    recordedUrl = URL.createObjectURL(new Blob(chunks, { type: 'video/webm' }));
     downloadBtn.classList.add('show');
     downloadBtn.onclick = () => {
       const link = document.createElement('a');
       link.href = recordedUrl;
-      link.download = 'frameflow-story.webm';
+      link.download = 'frameflow-cartoon.webm';
       link.click();
     };
 
-    statusEl.textContent = 'Your video is ready — download it below.';
+    setStatus('Your video is ready — download it below.');
     createBtn.disabled = false;
     isRecording = false;
+    isWorking = false;
   };
 
   recorder.start(250);
@@ -444,41 +647,29 @@ async function createVideo() {
     if (!isRecording) return;
 
     const elapsed = now - startedAt;
-    const photoIndex = Math.min(
-      photos.length - 1,
-      Math.floor(elapsed / timePerPhoto)
-    );
+    const photoIndex = Math.min(photos.length - 1, Math.floor(elapsed / timePerPhoto));
     const photoProgress = (elapsed % timePerPhoto) / timePerPhoto;
 
     drawScene(photoIndex, photoProgress, true);
 
-    document.getElementById('timeLabel').textContent =
-      formatTime(Math.min(elapsed, totalDuration));
-
-    document.getElementById('progress').style.width =
-      Math.min(100, (elapsed / totalDuration) * 100) + '%';
+    document.getElementById('timeLabel').textContent = formatTime(Math.min(elapsed, totalDuration));
+    document.getElementById('progress').style.width = Math.min(100, (elapsed / totalDuration) * 100) + '%';
 
     if (elapsed >= totalDuration) {
       drawScene(photos.length - 1, 1, true);
       setTimeout(() => recorder.stop(), 350);
       return;
     }
-
     requestAnimationFrame(drawFrame);
   }
-
   requestAnimationFrame(drawFrame);
 }
 
 createBtn.addEventListener('click', createVideo);
 
 [promptEl, styleEl].forEach(element => {
-  element.addEventListener('input', () => {
-    if (photos.length && !isRecording) showScene(0);
-  });
-  element.addEventListener('change', () => {
-    if (photos.length && !isRecording) showScene(0);
-  });
+  element.addEventListener('input', () => { if (photos.length && !isRecording) showScene(0); });
+  element.addEventListener('change', () => { if (photos.length && !isRecording) showScene(0); });
 });
 </script>
 </body>
